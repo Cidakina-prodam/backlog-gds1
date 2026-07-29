@@ -279,3 +279,39 @@ def history_from_csv_bytes(file_bytes):
         r['esforco_real_total'] = float(r['esforco_real_total'])
         rows.append(r)
     return rows
+
+
+def extract_state_from_html(html_bytes):
+    """
+    Extrai o histórico semanal e o mapeamento sigla->núcleo de dentro de um
+    HTML já distribuído anteriormente (o próprio dashboard.html carrega tudo
+    embutido em `const DATA = {...}`). Útil como alternativa simples ao
+    backup/restore em .zip: quem já guarda os HTMLs distribuídos por e-mail
+    não precisa de mais nada pra recuperar o histórico.
+
+    Retorna (history_rows, nucleo_mapping, avisos).
+    """
+    text = html_bytes.decode('utf-8', errors='replace')
+    marker = 'const DATA = '
+    idx = text.find(marker)
+    if idx == -1:
+        return [], {}, ["Não encontrei os dados embutidos nesse HTML — é mesmo um dashboard gerado por este app?"]
+    start = idx + len(marker)
+    try:
+        data, _ = json.JSONDecoder().raw_decode(text, start)
+    except json.JSONDecodeError as e:
+        return [], {}, [f"Não consegui ler os dados desse HTML (arquivo corrompido ou incompleto?): {e}"]
+
+    history_rows = data.get('history', [])
+    mapping = {}
+    for r in data.get('records', []):
+        sigla = r.get('sigla')
+        nuc = r.get('nucleoNegocio')
+        if sigla and nuc and nuc != 'Não classificado':
+            mapping[sigla] = nuc
+
+    avisos = []
+    if not history_rows:
+        avisos.append("Esse HTML não tinha histórico registrado ainda (era a primeira coleta dele).")
+    return history_rows, mapping, avisos
+

@@ -90,6 +90,21 @@ st.title("📊 Backlog GDS-1")
 # ---------------------------------------------------------------------------
 
 with st.sidebar:
+    st.header("0. Restaurar (opcional)")
+    st.caption("Se você já tem o HTML de uma semana anterior (o que foi distribuído), suba ele aqui pra recuperar o histórico antes de processar a coleta de hoje.")
+    html_restore = st.file_uploader("HTML de uma coleta anterior", type=["html", "htm"], key="html_restore_uploader")
+    if html_restore is not None:
+        if st.button("📄 Extrair histórico desse HTML", use_container_width=True):
+            hist_rows, mapping, avisos_html = dp.extract_state_from_html(html_restore.getvalue())
+            for a in avisos_html:
+                st.warning(a)
+            if hist_rows:
+                st.session_state.history_rows = dp.append_history(st.session_state.history_rows, hist_rows)
+                st.session_state.nucleo_mapping.update(mapping)
+                st.success(f"Recuperado: {len(hist_rows)} linha(s) de histórico e {len(mapping)} projeto(s) mapeados a partir do HTML.")
+                st.rerun()
+
+    st.divider()
     st.header("1. Upload dos exports")
     uploaded = st.file_uploader(
         "CSV/XLSX do GDP (Export Demandas)",
@@ -139,7 +154,7 @@ with st.sidebar:
         st.info("💡 Configure GITHUB_TOKEN + GITHUB_REPO em Secrets pra não precisar mais de backup manual (veja o README).")
 
     st.header("💾 Backup / ♻️ Restore manual")
-    st.caption("Use isso só se a sincronização automática com o GitHub não estiver configurada, ou como cópia extra de segurança.")
+    st.caption("Use isso só se a sincronização automática com o GitHub não estiver configurada, ou como cópia extra de segurança. (A opção de restaurar por HTML anterior está no topo da barra lateral.)")
 
     def make_backup_zip():
         buf = io.BytesIO()
@@ -170,6 +185,16 @@ with st.sidebar:
                 st.rerun()
             except Exception as e:
                 st.error(f"Erro ao restaurar backup: {e}")
+
+# ---------------------------------------------------------------------------
+# Processamento
+
+                st.warning(a)
+            if hist_rows:
+                st.session_state.history_rows = dp.append_history(st.session_state.history_rows, hist_rows)
+                st.session_state.nucleo_mapping.update(mapping)
+                st.success(f"Recuperado: {len(hist_rows)} linha(s) de histórico e {len(mapping)} projeto(s) mapeados a partir do HTML.")
+                st.rerun()
 
 # ---------------------------------------------------------------------------
 # Processamento
