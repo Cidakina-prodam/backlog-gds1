@@ -2,10 +2,10 @@
 Backlog GDS-1 — app Streamlit
 Upload dos exports do SIGA -> dashboard consolidado com histórico semanal.
 
-Persistência: como o Streamlit Community Cloud não garante disco entre
-reinicializações, o estado (histórico semanal + mapeamento núcleo) é mantido
-em st.session_state durante o uso e pode ser salvo/recuperado manualmente
-pelos botões de Backup / Restore (arquivo .zip).
+Persistência: se GITHUB_TOKEN e GITHUB_REPO estiverem configurados em
+st.secrets, o app salva e carrega o histórico/mapeamento automaticamente
+como commits no repositório (veja github_sync.py) — não precisa de
+Backup/Restore manual. Sem esses secrets, cai no modo manual (.zip).
 """
 import io
 import json
@@ -15,6 +15,7 @@ import streamlit as st
 
 import data_processing as dp
 import dashboard_template as db
+import github_sync as gh
 
 st.set_page_config(page_title="Backlog GDS-1", page_icon="📊", layout="wide")
 
@@ -66,6 +67,21 @@ if "dataset" not in st.session_state:
     st.session_state.dataset = None
 if "avisos" not in st.session_state:
     st.session_state.avisos = []
+if "github_status" not in st.session_state:
+    st.session_state.github_status = None  # 'ok' | 'erro' | None
+
+# --- carga automática do GitHub (uma vez por sessão) ---
+if gh.is_configured() and not st.session_state.get("github_loaded"):
+    try:
+        hist_text, mapping = gh.load_state()
+        if hist_text:
+            st.session_state.history_rows = dp.history_from_csv_bytes(hist_text.encode("utf-8"))
+        if mapping:
+            st.session_state.nucleo_mapping.update(mapping)
+        st.session_state.github_status = "ok"
+    except Exception as e:
+        st.session_state.github_status = f"erro: {e}"
+    st.session_state.github_loaded = True
 
 st.title("📊 Backlog GDS-1")
 
@@ -114,8 +130,16 @@ with st.sidebar:
     processar = st.button("🔄 Processar upload", type="primary", disabled=not uploaded)
 
     st.divider()
-    st.header("💾 Backup / ♻️ Restore")
-    st.caption("Guarda o histórico semanal + mapeamento de núcleos. Os CSVs de origem você sempre reenvia frescos.")
+    if gh.is_configured():
+        if st.session_state.github_status == "ok":
+            st.success("🔗 Conectado ao GitHub — histórico salvo automaticamente a cada processamento.")
+        elif st.session_state.github_status and st.session_state.github_status.startswith("erro"):
+            st.error(f"⚠️ Falha ao conectar no GitHub ({st.session_state.github_status}). Usando modo manual por enquanto.")
+    else:
+        st.info("💡 Configure GITHUB_TOKEN + GITHUB_REPO em Secrets pra não precisar mais de backup manual (veja o README).")
+
+    st.header("💾 Backup / ♻️ Restore manual")
+    st.caption("Use isso só se a sincronização automática com o GitHub não estiver configurada, ou como cópia extra de segurança.")
 
     def make_backup_zip():
         buf = io.BytesIO()
@@ -162,6 +186,17 @@ if processar and uploaded:
     st.session_state.history_rows = dp.append_history(st.session_state.history_rows, new_hist)
 
     st.success(f"Processado: {len(dataset['records'])} demandas em backlog aberto ({len(files)} arquivo(s)).")
+
+    if gh.is_configured():
+        try:
+            gh.save_state(
+                dp.history_to_csv_bytes(st.session_state.history_rows),
+                st.session_state.nucleo_mapping,
+                commit_message=f"Atualiza backlog GDS-1 — coleta {snapshot_date.isoformat()}",
+            )
+            st.success("🔗 Histórico salvo automaticamente no GitHub.")
+        except Exception as e:
+            st.warning(f"Não consegui salvar no GitHub automaticamente ({e}). Baixe o backup manual como precaução.")
 
 # ---------------------------------------------------------------------------
 # Corpo principal

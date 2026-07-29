@@ -667,7 +667,7 @@ function renderEvolution(){
     return;
   }
 
-  const W=1000,H=300,padL=50,padR=46,padT=20,padB=36;
+  const W=1000,H=300,padL=54,padR=46,padT=20,padB=36;
   const plotW = W-padL-padR, plotH = H-padT-padB;
   const order = ['GDS-1','NSS1','NSS2','NSS3','NC'];
   const visible = order.filter(k=>byNucleo[k] && !evolHidden.has(k));
@@ -705,22 +705,33 @@ function renderEvolution(){
     });
   });
   // rótulos do último ponto de cada série — com correção de colisão vertical
-  let endLabels = visible.map(k=>{
-    const rows = byNucleo[k];
-    const last = rows[rows.length-1];
-    return {k, col: EVOL_COLORS[k]||'#888', val: last.backlog_total, x: x(rows.length-1), yTrue: y(last.backlog_total)};
-  });
-  endLabels.sort((a,b)=>a.yTrue-b.yTrue);
-  const minGap = 13;
-  endLabels.forEach((l,i)=>{ l.yLabel = l.yTrue; });
-  for(let i=1;i<endLabels.length;i++){
-    if(endLabels[i].yLabel - endLabels[i-1].yLabel < minGap){
-      endLabels[i].yLabel = endLabels[i-1].yLabel + minGap;
+  function layoutLabels(getVal){
+    let items = visible.map(k=>{
+      const rows = byNucleo[k];
+      const r = getVal(rows);
+      return {k, col: EVOL_COLORS[k]||'#888', val: r.backlog_total, yTrue: y(r.backlog_total)};
+    });
+    items.sort((a,b)=>a.yTrue-b.yTrue);
+    const minGap = 13;
+    items.forEach(l=>{ l.yLabel = l.yTrue; });
+    for(let i=1;i<items.length;i++){
+      if(items[i].yLabel - items[i-1].yLabel < minGap){
+        items[i].yLabel = items[i-1].yLabel + minGap;
+      }
     }
+    return items;
   }
+  const endLabels = layoutLabels(rows=>rows[rows.length-1]);
   endLabels.forEach(l=>{
-    html += `<text x="${l.x+8}" y="${l.yLabel+4}" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="${l.col}">${l.val}</text>`;
+    html += `<text x="${x(dates.length-1)+8}" y="${l.yLabel+4}" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="${l.col}">${l.val}</text>`;
   });
+  // rótulos do primeiro ponto (valor da coleta anterior), só quando há 2+ semanas
+  if(dates.length>1){
+    const startLabels = layoutLabels(rows=>rows[0]);
+    startLabels.forEach(l=>{
+      html += `<text x="${x(0)-8}" y="${l.yLabel+4}" text-anchor="end" font-family="IBM Plex Mono" font-size="11" font-weight="600" fill="${l.col}" opacity="0.75">${l.val}</text>`;
+    });
+  }
 
   svg.style.display='';
   svg.innerHTML = html;

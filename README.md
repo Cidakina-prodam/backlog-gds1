@@ -36,10 +36,34 @@ README.md
 2. Antes de publicar, vá em **Advanced settings → Secrets** e cole:
    ```toml
    APP_PASSWORD = "sua-senha-aqui"
+
+   # opcional, mas recomendado — salva o histórico automaticamente no
+   # GitHub a cada processamento, sem precisar de backup/restore manual:
+   GITHUB_TOKEN = "ghp_xxxxxxxxxxxxxxxxxxxx"
+   GITHUB_REPO = "Cidakina-prodam/backlog-gds1"
    ```
 3. Deploy. O app fica num link público (`*.streamlit.app`) — **só quem tem
    a senha consegue ver os dados**, mas o link em si não é secreto. Trate a
    senha como você trataria a senha de um sistema interno.
+
+### Como criar o GITHUB_TOKEN (opcional, mas resolve o backup manual)
+
+1. No GitHub: **foto de perfil → Settings → Developer settings →
+   Personal access tokens → Fine-grained tokens → Generate new token**
+2. Em **Repository access**, escolha **Only select repositories** e marque
+   só o repositório deste app (`backlog-gds1`)
+3. Em **Permissions → Repository permissions**, dê acesso de
+   **Read and write** em **Contents**
+4. Gere o token e cole no Secrets do Streamlit Cloud como `GITHUB_TOKEN`
+   (junto com `GITHUB_REPO` no formato `usuario/nome-do-repo`)
+5. Reboot no app. Se conectou certo, a barra lateral mostra
+   "🔗 Conectado ao GitHub — histórico salvo automaticamente"
+
+Com isso configurado, o app passa a **ler o histórico do repositório
+automaticamente ao abrir** e **gravar de volta (como um commit) toda vez
+que você processa um upload** — os botões de Backup/Restore manual
+continuam existindo como reserva, mas na prática você não vai precisar
+mais deles no dia a dia.
 
 ## Como rodar localmente (opcional)
 
@@ -59,13 +83,12 @@ streamlit run app.py
 3. **Processar upload**: roda o pipeline e monta o dashboard.
 4. **Distribuição**: baixa o HTML autocontido pra mandar por e-mail/Drive —
    é o mesmo formato usado até aqui, sem depender do app pra ser aberto.
-5. **Backup**: baixa um `.zip` pequeno com o histórico semanal (pro gráfico
-   de evolução) e o mapeamento de núcleos. **Baixe esse backup depois de
-   cada atualização** — é o que garante a continuidade do histórico entre
-   sessões, já que o Streamlit Community Cloud não garante disco persistente.
-6. **Restore**: no início de uma sessão nova (ou se o app reiniciar/redeployar
-   e perder o estado em memória), suba o último `.zip` de backup pra
-   continuar de onde parou.
+5. **Backup manual (opcional)**: se você não configurou `GITHUB_TOKEN`, baixe
+   o `.zip` depois de cada atualização — é o que garante a continuidade do
+   histórico entre sessões. Se configurou, isso já acontece sozinho e o
+   botão vira só uma cópia extra de segurança.
+6. **Restore manual (opcional)**: mesma lógica — só necessário se não tiver
+   o GitHub conectado, ou se quiser restaurar um ponto específico do passado.
 
 ### Por que backup/restore manual em vez de salvar tudo automaticamente?
 
